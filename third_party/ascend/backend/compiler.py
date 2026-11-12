@@ -882,6 +882,20 @@ def ttir_to_linalg(mod, metadata, opt, *, named_ops=True):
             else:
                 os.environ.pop("TRITON_ASCEND_REORDER_SEED", None)
 
+        # costmodel seed table logic
+        kernel_name = re.search(r"tt\.func\spublic\s+@(\w+)", ttir_code).group(1)
+        seed_table_path = os.getenv("CM_SEED_TABLE_PATH") or None
+        if seed_table_path is not None:
+            print(f'[CM_SEED_TESTING] seed_table_path={seed_table_path}')
+            
+            seed = os.getenv("TRITON_ASCEND_REORDER_SEED") or "0"
+            enable_dynamic_cv_pipeline_var = metadata.get("enable_dynamic_cv_pipeline")
+
+            with open(seed_table_path, "a") as f:
+                f.write(f"{kernel_name};{seed};{enable_dynamic_cv_pipeline_var}\n")
+        else:
+            print(f'[CM_SEED_TESTING][WARNING] seed_table_path is None')
+
         if opt.debug:
             # Print the equivalent triton-opt command line so the pass
             # pipeline can be reproduced and debugged outside of Python.
