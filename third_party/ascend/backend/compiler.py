@@ -874,8 +874,9 @@ def ttir_to_linalg(mod, metadata, opt, *, named_ops=True):
 
         import time
         variant_search_start = time.perf_counter()
+        rejected_counter = 0
         if variant_count > 1 and metadata.get("enable_dynamic_cv_pipeline"):
-            best_seed = _run_dynamic_cv_variant_search(
+            best_seed, rejected_counter = _run_dynamic_cv_variant_search(
                 src_path=src_path,
                 pipeline_str=pm.get_pipeline_str(),
                 variant_count=variant_count,
@@ -897,7 +898,7 @@ def ttir_to_linalg(mod, metadata, opt, *, named_ops=True):
             hash_var = metadata.get('hash', '')
             variant_search_elapsed = time.perf_counter() - variant_search_start
             with open(seed_table_path, "a") as f:
-                f.write(f"{kernel_name};{hash_var};{seed};{enable_dynamic_cv_pipeline_var};{variant_search_elapsed:.6f}\n")
+                f.write(f"{kernel_name};{hash_var};{seed};{enable_dynamic_cv_pipeline_var};{rejected_counter};{variant_search_elapsed:.6f}\n")
         else:
             print(f'[CM_SEED_TESTING][WARNING] seed_table_path is None')
 
