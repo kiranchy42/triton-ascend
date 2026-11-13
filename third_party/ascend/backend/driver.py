@@ -274,11 +274,42 @@ class NPULauncher(object):
                     return exit_hook(launch_metadata)
 
                 args = (*args[:8], synchronized_exit, *args[9:])
-            profiler_registered = self.launch(*args, scratch, **kwargs)
+            profiler_registered = raw_perf_launch_wrapper(self.launch, *args, scratch=scratch, **kwargs)
         else:
-            profiler_registered = self.launch(*args, **kwargs)
+            profiler_registered = raw_perf_launch_wrapper(self.launch, *args, **kwargs)
         _ascend_utils.TRITON_PROFILER_REGISTERED = (profiler_registered == 1)
 
+def raw_perf_launch_wrapper(launch, *args, scratch=None, **kwargs):
+    raw_perf_path = os.getenv("TRITON_ASCEND_RAW_PERF_PATH")
+    if raw_perf_path:
+        import time
+        device_interface = get_backend_func("get_device_interface")
+        device_interface.synchronize()
+        raw_perf_start = time.perf_counter()
+
+    launch_ret = 0
+    if scratch is None:
+        launch_ret = launch(*args, **kwargs)
+    else:
+        launch_ret = launch(*args, scratch, **kwargs)
+
+    if raw_perf_path:
+        device_interface.synchronize()
+        raw_perf_elapsed = time.perf_counter() - raw_perf_start
+
+        packed_metadata = args[5]
+        kernel_name = packed_metadata.get("kernel_name", "default_name")
+        kernel_hash = packed_metadata.get("hash", "")
+        kernel_shapes = [
+            tuple(arg.shape)
+            for arg in args[9:]
+            if hasattr(arg, "shape")
+        ]
+
+        with open(raw_perf_path, "a") as f:
+            f.write(f"{kernel_name},{kernel_hash},{raw_perf_elapsed},{kernel_shapes}\n")
+
+    return launch_ret
 
 class NPUDriver(DriverBase):
 
