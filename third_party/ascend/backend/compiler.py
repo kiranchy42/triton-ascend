@@ -630,6 +630,7 @@ def _run_dynamic_cv_variant_search(src_path: str, pipeline_str: str, variant_cou
     else:
         print(", none usable; compiling without a variant")
 
+    rejected_counter = 0
     for err, count in failures.items():
         print(f"[AddDynamicCVPipeline]   rejected {count} with ", end="")
         if err == -1:
@@ -645,13 +646,14 @@ def _run_dynamic_cv_variant_search(src_path: str, pipeline_str: str, variant_cou
             print(f"a timeout (hung for more than {seed_timeout} seconds)")
         else:
             print(f"error code {err}")
+        rejected_counter += 1
 
     if best_seed < 0:
         print("[AddDynamicCVPipeline]   reproduce one of them with TRITON_ASCEND_REORDER_SEED=0 and no "
               "TRITON_ASCEND_CV_VARIANTS to see the failure itself")
 
     sys.stdout.flush()
-    return best_seed if best_seed >= 0 else None
+    return best_seed if best_seed >= 0 else None, rejected_counter
 
 
 def _graph_optimize_core_num(opt):
@@ -870,6 +872,8 @@ def ttir_to_linalg(mod, metadata, opt, *, named_ops=True):
         variant_count = _get_env_int("TRITON_ASCEND_CV_VARIANTS") or 1
         orig_cv_variants = os.environ.get("TRITON_ASCEND_CV_VARIANTS")
 
+        import time
+        variant_search_start = time.perf_counter()
         if variant_count > 1 and metadata.get("enable_dynamic_cv_pipeline"):
             best_seed = _run_dynamic_cv_variant_search(
                 src_path=src_path,
@@ -890,9 +894,10 @@ def ttir_to_linalg(mod, metadata, opt, *, named_ops=True):
             
             seed = os.getenv("TRITON_ASCEND_REORDER_SEED") or "0"
             enable_dynamic_cv_pipeline_var = metadata.get("enable_dynamic_cv_pipeline")
-
+            hash_var = metadata.get('hash', '')
+            variant_search_elapsed = time.perf_counter() - variant_search_start
             with open(seed_table_path, "a") as f:
-                f.write(f"{kernel_name};{seed};{enable_dynamic_cv_pipeline_var}\n")
+                f.write(f"{kernel_name};{hash_var};{seed};{enable_dynamic_cv_pipeline_var};{variant_search_elapsed:.6f}\n")
         else:
             print(f'[CM_SEED_TESTING][WARNING] seed_table_path is None')
 
