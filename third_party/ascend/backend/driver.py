@@ -306,8 +306,11 @@ def raw_perf_launch_wrapper(launch, *args, scratch=None, **kwargs):
             if hasattr(arg, "shape")
         ]
 
+        is_raw_perf_table_empty = (not os.path.exists(raw_perf_path) or os.path.getsize(raw_perf_path) == 0)
         with open(raw_perf_path, "a") as f:
-            f.write(f"{kernel_name},{kernel_hash},{raw_perf_elapsed},{kernel_shapes}\n")
+            if is_raw_perf_table_empty: 
+                f.write(f"name|hash|working time|shapes\n")
+            f.write(f"{kernel_name}|{kernel_hash}|{raw_perf_elapsed}|{kernel_shapes}\n")
 
     return launch_ret
 
