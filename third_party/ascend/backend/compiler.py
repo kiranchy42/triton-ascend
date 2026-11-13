@@ -646,7 +646,7 @@ def _run_dynamic_cv_variant_search(src_path: str, pipeline_str: str, variant_cou
             print(f"a timeout (hung for more than {seed_timeout} seconds)")
         else:
             print(f"error code {err}")
-        rejected_counter += 1
+        rejected_counter += count
 
     if best_seed < 0:
         print("[AddDynamicCVPipeline]   reproduce one of them with TRITON_ASCEND_REORDER_SEED=0 and no "
